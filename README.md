@@ -8,4 +8,5 @@ using web-serial.js. Depending on the signal the arduino recieves from the javas
 For information on handsfree.js and web-serial.js, see:
 
 https://google.github.io/mediapipe/solutions/hands.html
+
 https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API
