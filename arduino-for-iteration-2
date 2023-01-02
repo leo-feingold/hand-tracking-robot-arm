@@ -1,0 +1,74 @@
+#include <Servo.h>
+
+String recv;
+String letter;
+String originalNum;
+
+
+const int rotatePin = 2;
+const int shoulderPin = 5;
+const int elbowPin = 1;
+const int pinchPin = 6;
+
+
+Servo servoRotate;
+Servo servoShoulder;
+Servo servoElbow;
+Servo servoPinch;
+
+int rotatePos = 90;
+int shoulderPos = 90;
+int elbowPos = 90;
+int pinchPos = 90;
+
+void setup(){
+  Serial.begin(9600);
+  servoRotate.attach(rotatePin);
+  servoShoulder.attach(shoulderPin);
+  servoElbow.attach(elbowPin);
+  servoPinch.attach(pinchPin);
+ // reset();
+ 
+}
+
+void loop(){
+  readValues();
+
+}
+
+void readValues(){
+  if (Serial.available()) {
+        // If data is available to read, seperate the string into parts
+        recv = Serial.readStringUntil('\n');
+        letter = recv.substring(0,1); //letter to index what part of the arm the position is for
+        originalNum = (recv.substring(1)); //this is the position but it is in string form
+        int newNum = originalNum.toInt();  //convert it to integer form
+
+        //each letter corresponds to a different movmement
+        if(letter == "a"){
+          pinchPos = newNum;
+        }else if(letter == "b"){
+          rotatePos = newNum;
+        }else if(letter == "c"){
+          elbowPos = newNum;
+        }else if(letter == "d"){
+          shoulderPos = newNum;
+        }
+        
+        servoRotate.write(180-rotatePos); //the arm would rotate in the oppostite direction we wanted to we had to swap it
+        servoShoulder.write(shoulderPos);
+        servoElbow.write(elbowPos);
+        servoPinch.write(pinchPos);
+        
+          
+   }
+}
+
+    
+//reset the all the servos to position 0
+ void reset(){
+  rotatePos = 0;
+  shoulderPos = 0;
+  elbowPos = 0;
+  pinchPos = 0;
+ }
