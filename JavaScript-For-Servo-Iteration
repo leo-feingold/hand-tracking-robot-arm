@@ -1,0 +1,173 @@
+let port, reader, writer;
+var startTesting = false;
+let ratioDistance;
+var sender = '';
+
+async function setup() {
+
+  sketch = createCanvas(640, 480)
+  background("black");
+  
+
+noLoop();
+({ port, reader, writer } = await getPort());
+loop();
+  
+    handsfree = new Handsfree({
+      hands: true
+    })
+    handsfree.enablePlugins('browser')
+    handsfree.plugin.pinchScroll.disable()
+  
+  //Create a "Start Webcam" button
+  buttonStart = createButton('Start Webcam')
+  buttonStart.class('handsfree-show-when-stopped')
+  buttonStart.class('handsfree-hide-when-loading')
+  buttonStart.mousePressed(() => handsfree.start())
+
+  // Create a "loading..." button
+  buttonLoading = createButton('...loading...')
+  buttonLoading.class('handsfree-show-when-loading')
+
+  // Create a stop button
+  buttonStop = createButton('Stop Webcam')
+  buttonStop.class('handsfree-show-when-started')
+  buttonStop.mousePressed(() => handsfree.stop())
+  
+}
+
+async function draw() {
+  
+    //show the hand landmarks on the screen
+    background(0);
+    drawHands();
+  
+//if there is a connected port (arduino board) and startTesting is true, run the code
+if (port && startTesting) {
+try {
+  if(startTesting){
+
+              
+  
+                //run the functions
+                await myRatiosFunction();
+                await myPinchFunction();
+                await myRotateFunction();
+                await myElbowFunction();
+
+           }
+       //if there is an error
+     } catch (e) { console.error(e) }
+  }
+  
+}
+
+function drawHands () {
+  const hands = handsfree.data?.hands
+  
+  // Bail if we don't have anything to draw
+  if (!hands?.landmarks) return
+  
+  // Draw keypoints
+  hands.landmarks.forEach((hand, handIndex) => {
+    hand.forEach((landmark, landmarkIndex) => {
+
+        circleSize = 20
+  
+      stroke(0)
+      circle(
+        // Flip horizontally
+        sketch.width - landmark.x * sketch.width,
+        landmark.y * sketch.height,
+        circleSize
+      )
+    })
+  })
+}
+
+//start tracking hands if any key is pressed
+function keyPressed(){
+  startTesting = true;
+}
+
+//Ratio function to fix problem with depth
+//Without this using ratio, then the program wouldn't work if you stood too close or to far from the screen
+function myRatiosFunctions(){
+    const hands = handsfree.data? handsfree.data.hands : null
+    ratioDistance = dist(hands.landmarks[1][19].x, hands.landmarks[1][19].y, hands.landmarks[1][20].x, hands.landmarks[1][20].y)
+
+}
+
+//Pinch function
+function myPinchFunction(){
+  const hands = handsfree.data? handsfree.data.hands : null
+  //this is the distance between the tip of my thumb to the tip of my pointer on my right hand
+  let pinch1Distance = dist(hands.landmarks[1][4].x, hands.landmarks[1][4].y, hands.landmarks[1][8].x, hands.landmarks[1][8].y)
+  //scaled distance to fix depth problem
+  let scaledPinchDistance = ((pinch1Distance)/(ratioDistance))
+  //scaled to a value between 0 and 180
+  //We got the function below using a line best fit function in google sheets
+  posForPinch = Math.round((-20*(scaledPinchDistance) + 193))
+  
+  
+  //Because the function is an approxamation, it would be possible to go above 180 or below 0, so we have these checks to make sure that doesn't happen
+  
+  if (posForPinch > 180){
+    posForPinch = 180
+  }
+  
+  else if (posForPinch < 0){
+    posForPinch = 0
+  }
+  
+  
+  //this is the string that gets sent to the arduino
+  //'a' indicates that it is the pinch function and the '\n' is to know when to stop reading the string
+  //this is handled in the Arduino code
+  sender = ("a" + posForPinch + "\n")
+  writer.write(sender)
+
+}
+
+//this rotation function works the same as the pinch function
+function myRotateFunction(){
+    const hands = handsfree.data? handsfree.data.hands : null
+    let rotateDistance = hands.landmarks[1][16].x - hands.landmarks[1][21].x
+    let rotateScaled = (rotateDistance/ratioDistance)
+    
+    let posForRotate = Math.round(-46.7*rotateScaled + 58.9)
+    
+    if (posForRotate > 180){
+    posForRotate = 180
+  }
+  
+  else if (posForRotate < 0){
+    posForRotate = 0
+  }
+    
+    sender = ("b" + posForRotate + "\n")
+    writer.write(sender)
+  
+}
+
+//in this function, we wanted to control the arm's elbow joint through moving the hand closer and further from the webcam, so here there is no ratio scaling distance
+//Other than that, it works the same as the pinch function and rotate function
+
+function myElbowFunction(){
+  const hands = handsfree.data? handsfree.data.hands : null
+  let elbowDistance = hands.landmarks[1][21].y
+  let posForElbow = Math.round(-375*elbowDistance + 285)
+  
+  if (posForElbow > 180){
+    posForElbow = 180
+  }
+  
+  else if (posForElbow < 0){
+    posForElbow = 0
+  }
+  
+  sender = ("c" + posForElbow + "\n")
+  writer.write(sender)
+  console.log(sender)
+  
+}
